@@ -1,9 +1,9 @@
 {
-    "seed_urls": [],
-    "headers": {},
-    "total_articles_to_find_and_parse": 0,
-    "encoding": "",
-    "timeout": 0,
+    "seed_urls": ["https://ilibrary.ru/"],
+    "headers": {"User-Agent": "Mozilla/5.0"},
+    "total_articles_to_find_and_parse": 10,
+    "encoding": "windows-1251",
+    "timeout": 10,
     "should_verify_certificate": true,
     "headless_mode": true
 }
