@@ -1,0 +1,3 @@
+from spacy.language import Language
+
+def load_from_path(lang: str, path: str, meta: dict | None = None) -> Language: ...

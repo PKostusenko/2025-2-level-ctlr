@@ -49,6 +49,7 @@ filepath
 filesystem
 fpl
 func
+getter
 gorod
 gsd
 htmlparser
@@ -57,7 +58,7 @@ https
 inan
 instantiation
 json
-kazyulina
+kashchikhin
 klimova
 kwargs
 lemmatization
@@ -119,6 +120,7 @@ subtype
 syntagrus
 sys
 tbd
+teardown
 textprocessingpipeline
 textprocessingpipelinescorefourreferenceprocess
 textprocessingpipelinescoresixreferenceprocess
@@ -135,7 +137,6 @@ udpipeanalyzer
 udpipeanalyzertest
 ui
 undirected
-unifiedconlludocument
 unigrams
 universaldependencies
 unlink

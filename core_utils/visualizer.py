@@ -5,22 +5,26 @@ Visualizer module for visualizing PosFrequencyPipeline results.
 from pathlib import Path
 from typing import Callable
 
+from quality_control.console_logging import get_child_logger
+
+logger = get_child_logger(__file__)
+
 try:
     import matplotlib
     import matplotlib.pyplot as plt
 
     matplotlib.use("agg")
 except ImportError:  # pragma: no cover
-    print("No libraries installed. Failed to import.")
+    logger.warning("No libraries installed. Failed to import.")
 
 try:
     import networkx as nx
     from networkx import DiGraph
 except ImportError:  # pragma: no cover
     DiGraph = None  # type: ignore
-    print("No libraries installed. Failed to import.")
+    logger.warning("No libraries installed. Failed to import.")
 
-from core_utils.article.article import Article
+from core_utils.article.article import Article  # pylint: disable=wrong-import-position
 
 
 def visualize(article: Article, path_to_save: Path) -> None:

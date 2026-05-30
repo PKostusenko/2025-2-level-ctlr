@@ -12,7 +12,7 @@ concurrency:
 
 env:
   REPOSITORY_TYPE: public
-  MODEL_URL: "https://github.com/fipl-hse/2024-2-level-ctlr/releases/download/v1.0.0/russian-syntagrus-ud-2.0-170801.udpipe"
+  MODEL_URL: "https://github.com/fipl-hse/2025-2-level-ctlr/releases/download/v1.0.0/russian-syntagrus-ud-2.0-170801.udpipe"
   MODEL_PATH: "lab_6_pipeline/assets/model"
 
 jobs:
@@ -129,6 +129,22 @@ jobs:
           export PYTHONPATH=$(pwd)
           fiplconfig.check_newline
 
+  checking-module-usage:
+    name: Prohibited module usage check
+    needs: [install-dependencies]
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup FIPL environment
+        uses: fipl-hse/setup-env-action@v0.13.2
+      - name: Run module_usage_check
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$(pwd)
+          fiplconfig.check_module_usage
+
   # Stage 2. Crawler tests
   checking-crawler-config:
     name: Crawler checks config
@@ -238,19 +254,38 @@ jobs:
     needs: [checking-articles-dataset]
     runs-on: ubuntu-latest
     timeout-minutes: 2
+    outputs:
+      should_run: ${{ steps.pipeline-check.outputs.should_run }}
     steps:
+      - uses: actions/checkout@v6
+      - name: Setup FIPL environment
+        uses: fipl-hse/setup-env-action@v0.13.2
       - name: Congratulations
         run: |
           echo "You have completed the crawler!"
+      - name: Check for pipeline
+        id: pipeline-check
+        run: |
+          source venv/bin/activate
+          export PYTHONPATH=$(pwd):$PYTHONPATH
+          
+          if [[ $(python admin_utils/skip_stage.py --lab-path lab_6_pipeline) ]]; then
+            echo "No pipeline to run."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "No reason to skip pipeline."
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
 
   # Stage 3. Pipeline tests
   milestone-2-pipeline:
     name: Starting pipeline checks!
     needs: [milestone-1-crawler-is-working]
+    if: needs.milestone-1-crawler-is-working.outputs.should_run == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
-      - name: Congratulations
+      - name: Allowed to run pipeline
         run: |
           echo "Preparing pipeline checks"
 
@@ -344,10 +379,6 @@ jobs:
         run: |
           source venv/bin/activate
           export PYTHONPATH=$(pwd):$PYTHONPATH
-
-          if [[ $(python admin_utils/skip_stage.py --lab-path lab_6_pipeline) ]]; then
-            exit 0
-          fi
 
           python admin_utils/unpack_archived_dataset.py lab_6_pipeline
           python lab_6_pipeline/pipeline.py

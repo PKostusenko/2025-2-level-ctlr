@@ -30,3 +30,15 @@ Key strategies for finding elements:
 by ``id``, by class, by attribute, by tag name, by child-parent relations, and by combination
 of aforementioned approaches. Making requests with ``requests`` API.
 `bs4`: installation, basic API. Finding elements in `HTML` page with `find`, `find_all`.
+
+Lecture 4. Filesystem with ``pathlib``. Dates
+---------------------------------------------
+
+Paths as unique description of file position. Paths: relative and absolute.
+``pathlib`` as the recommended library for creating, writing and reading files.
+Construction of paths with forward slash. Recommendation to build paths based on
+``__file__`` global variable. Basic API: ``exists``, ``glob``, ``mkdir``.
+Removal of directories: ``rmdir`` versus ``shutil.rmtree``. Removal of files: ``unlink``.
+Date management as one of most challenging tasks in data analysis.
+Module ``datetime`` to process dates. Basic API: ``datetime`` class,
+static methods ``strftime`` for formatting dates and ``strptime`` for parsing them from string.

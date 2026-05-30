@@ -9,6 +9,13 @@
             "settings": {
                "ignore": ["lab_6_pipeline"]
             }
+        },
+        {
+            "name": "lab_6_pipeline",
+            "coverage": 99,
+            "stubs": [
+                "pipeline.py"
+            ]
         }
     ],
     "addons": [
@@ -33,8 +40,8 @@
             "Evgraff2005",
             "EIzharikov"
         ],
-        "pr_name_regex": "(?:\\[PROJECT\\]\\s*)?(Scraper|Pipeline|Final Project), [\\w\\s\\d]+ \\w+ - 2\\dFPL\\d",
-        "pr_name_example": "Scraper, Andrei Kashchikhin - 21FPL2 \nPipeline, Andrei Kashchikhin - 21FPL2 \n[PROJECT] Final Project, Team 7 Mandelstamm - 22FPL2"
+        "pr_name_regex": "(?:\\[PROJECT\\]\\s*)?(Scraper|Pipeline|Final Project), [\\w\\s\\d]+ - 2\\dFPL\\d",
+        "pr_name_example": "Scraper, Andrei Kashchikhin - 21FPL2 \nPipeline, Andrei Kashchikhin - 21FPL2 \n[PROJECT] Final Project, Team 7 - 21FPL2"
     },
     "stubs_config": {
         "accepted_modules": {
@@ -66,16 +73,10 @@
             "core_utils.pipeline": [
                 "PipelineProtocol",
                 "LibraryWrapper",
-                "AbstractCoNLLUAnalyzer",
-                "UDPipeDocument",
-                "UnifiedCoNLLUDocument",
-                "StanzaDocument",
-                "UnifiedCoNLLUDocument",
-                "CoNLLUDocument",
                 "TreeNode"
             ],
-            "networkx": [
-                "DiGraph"
+            "quality_control.console_logging": [
+                "get_child_logger"
             ]
         }
     },
@@ -101,5 +102,10 @@
         "\\.pkl$",
         "\\.udpipe$",
         "\\.zip$"
+    ],
+    "prohibited_modules": [
+        "collections",
+        "itertools",
+        "os"
     ]
 }

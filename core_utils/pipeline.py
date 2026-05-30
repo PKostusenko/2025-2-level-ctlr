@@ -6,7 +6,18 @@ Interface definitions for text processing pipelines.
 from dataclasses import dataclass
 from typing import Protocol
 
+from quality_control.console_logging import get_child_logger
+
 from core_utils.article.article import Article
+
+logger = get_child_logger(__file__)
+try:
+    from spacy.language import Language
+    from spacy.tokens import Doc
+except ImportError:
+    Language = None  # type: ignore
+    Doc = None  # type: ignore
+    logger.warning("No libraries installed. Failed to import.")
 
 
 class PipelineProtocol(Protocol):
@@ -20,76 +31,22 @@ class PipelineProtocol(Protocol):
         """
 
 
-class CoNLLUDocument(Protocol):
-    """
-    Utility class to mimic analyzer document class.
-    """
-
-
-@dataclass
-class ConLLUWord:
-    """
-    Interface definition for word class of unified analyzer document.
-    """
-
-    id: str
-    upos: str
-    head: str
-    deprel: str
-    text: str
-
-
-@dataclass
-class ConLLUSentence:
-    """
-    Interface definition for sentence class of unified analyzer document.
-    """
-
-    words: list[ConLLUWord]
-
-
-@dataclass
-class UnifiedCoNLLUDocument:
-    """
-    Interface definition for sentence class of unified analyzer document.
-    """
-
-    sentences: list[ConLLUSentence]
-
-
-class AbstractCoNLLUAnalyzer(Protocol):
-    """
-    Mock definition of library-specific entity.
-    """
-
-    def __call__(self, text: str) -> CoNLLUDocument:
-        """
-        Run analyzer as a function.
-
-        Args:
-            text (str): Raw document content.
-
-        Returns:
-            CoNLLUDocument: Output document.
-        """
-
-
 class LibraryWrapper(Protocol):
     """
     Interface definition for text analyzers.
     """
 
-    _analyzer: AbstractCoNLLUAnalyzer
+    _analyzer: Language
 
-    def _bootstrap(self) -> AbstractCoNLLUAnalyzer:
+    def _bootstrap(self) -> Language:
         """
         Bootstrap analyzer with required models and settings.
 
         Returns:
-            AbstractCoNLLUAnalyzer: Instance of analyzer.
+            Language: Instance of analyzer.
         """
 
-    def analyze(self, texts: list[str]) -> list[CoNLLUDocument | str]:
+    def analyze(self, texts: list[str]) -> list[str]:
         """
         Analyze given texts.
 
@@ -97,7 +54,7 @@ class LibraryWrapper(Protocol):
             texts (list[str]): Texts to analyze.
 
         Returns:
-            list[CoNLLUDocument | str]: Collection of processed documents.
+            list[str]: Collection of processed documents.
         """
 
     def to_conllu(self, article: Article) -> None:
@@ -108,7 +65,7 @@ class LibraryWrapper(Protocol):
             article (Article): Article to save
         """
 
-    def from_conllu(self, article: Article) -> CoNLLUDocument:
+    def from_conllu(self, article: Article) -> Doc:
         """
         Load ConLLU content from article stored on disk.
 
@@ -116,18 +73,7 @@ class LibraryWrapper(Protocol):
             article (Article): Article to load
 
         Returns:
-            CoNLLUDocument: Document ready for parsing
-        """
-
-    def get_document(self, doc: CoNLLUDocument) -> UnifiedCoNLLUDocument:
-        """
-        Present ConLLU document's sentence tokens as a unified structure.
-
-        Args:
-            doc (CoNLLUDocument): ConLLU document from analyzer.
-
-        Returns:
-            UnifiedCoNLLUDocument: Unified document of token features within document sentences
+            Doc: Document ready for parsing
         """
 
 

@@ -71,16 +71,6 @@ in order to be considered compatible with that protocol.
 It influences the code implicitly and, if necessary, organizes a check
 for the presence of methods or attributes in the corresponding classes.
 
-:py:class:`core_utils.pipeline.AbstractCoNLLUAnalyzer` protocol mimics
-analyzer instance for UDPipe model. It does not impose a special interface
-but simply indicates that this object is responsible for analyzing the language material.
-
-:py:class:`core_utils.pipeline.CoNLLUDocument` protocol is the class that mimics UDPipe
-document. Linguistic data retrieval models process texts and return
-CoNLL-U formatted markup as instances of :py:class:`core_utils.pipeline.CoNLLUDocument`.
-At the same time :py:class:`core_utils.pipeline.CoNLLUDocument`
-object contains information from ``.conllu`` file.
-
 :py:class:`core_utils.pipeline.LibraryWrapper` defines a specific set of methods and attributes
 to be present across all model wrappers:
 

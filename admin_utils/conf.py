@@ -34,8 +34,10 @@ intersphinx_mapping = {
 }
 
 nitpick_ignore = [
-    ("py:class", "spacy.tokens.token.Token"),
-    ("py:class", "spacy.tokens.Token"),
+    ("py:class", "Doc"),
+    ("py:class", "Language"),
+    ("py:class", "spacy.language.Language"),
+    ("py:class", "spacy.tokens.doc.Doc"),
     ("py:class", "DiGraph"),
     ("py:class", "pathlib._local.Path"),
     ("py:class", "optional"),

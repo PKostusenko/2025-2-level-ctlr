@@ -155,7 +155,7 @@ config/website/test_sphinx_project/_build
 # final project
 final_project/dist/auto_annotated.conllu
 !/final_project/dist
-/data
+final_project/dist/table_work
 
 # model
 lab_6_pipeline/assets

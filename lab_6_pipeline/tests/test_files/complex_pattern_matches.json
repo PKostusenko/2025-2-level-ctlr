@@ -1,0 +1,147 @@
+{
+  "Match cases": [
+    {
+      "0": [
+            {
+                "upos": "VERB",
+                "text": "пожаловались",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "проблемы",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "на",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "upos": "VERB",
+                "text": "пожаловались",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "интернетом",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "с",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            },
+            {
+                "upos": "VERB",
+                "text": "возникли",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "четверг",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "в",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "1": [
+            {
+                "upos": "VERB",
+                "text": "поступили",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "жителей",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "от",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    },
+    {
+      "0": [
+            {
+                "upos": "VERB",
+                "text": "пожаловались",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "проблемы",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "на",
+                                "children": []
+                            }
+                        ]
+                    },
+                    {
+                        "upos": "NOUN",
+                        "text": "интернетом",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "с",
+                                "children": []
+                            }
+                        ]
+                    }
+                    
+                ]
+            },
+            {
+                "upos": "VERB",
+                "text": "возникли",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "четверг",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "в",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ],
+        "1": [
+            {
+                "upos": "VERB",
+                "text": "поступили",
+                "children": [
+                    {
+                        "upos": "NOUN",
+                        "text": "жителей",
+                        "children": [
+                            {
+                                "upos": "ADP",
+                                "text": "от",
+                                "children": []
+                            }
+                        ]
+                    }
+                ]
+            }
+        ]
+    }
+  ]
+}

@@ -71,6 +71,28 @@
             }
         },
         {
+            "name": "[SEMINAR 4] Try UDPipe",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/seminars/seminar_05_18_2026/try_udpipe.py",
+            "cwd": "${workspaceFolder}/seminars/seminar_05_18_2026",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
+            "name": "[SEMINAR 5] Try NetworkX",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/seminars/seminar_05_25_2026/try_networkx.py",
+            "cwd": "${workspaceFolder}/seminars/seminar_05_25_2026",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}"
+            }
+        },
+        {
             "name": "[LAB 6] Pipeline",
             "type": "debugpy",
             "request": "launch",

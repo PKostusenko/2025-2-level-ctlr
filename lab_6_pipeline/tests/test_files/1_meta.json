@@ -1,0 +1,22 @@
+{
+    "id": 1,
+    "url": "test",
+    "title": "title",
+    "date": "1999-11-16 04:56:32",
+    "author": [
+        "Красивая Мама"
+    ],
+    "topics": [],
+    "pos_frequencies": {
+        "ADJ": 2,
+        "PUNCT": 3,
+        "NOUN": 4,
+        "ADV": 1,
+        "VERB": 1,
+        "ADP": 3,
+        "PROPN": 2,
+        "CCONJ": 1,
+        "NUM": 1,
+        "X": 1},
+    "pattern_matches": {}
+}
