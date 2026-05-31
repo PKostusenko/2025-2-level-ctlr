@@ -115,7 +115,7 @@ class CorpusManager:
         Get storage params.
 
         Returns:
-            dict[int, Article]: Storage params
+            dict: Storage params
         """
         return self._storage
 
