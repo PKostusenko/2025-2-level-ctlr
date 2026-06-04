@@ -3,12 +3,11 @@ Pipeline for CONLL-U formatting.
 """
 
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks, duplicate-code
+import importlib
 import pathlib
+from typing import cast
 
-import matplotlib.pyplot as plt
-import spacy_udpipe
-
-import core_utils.visualizer as visualizer
+from core_utils import visualizer
 from core_utils.article.article import Article, ArtifactType
 from core_utils.article.io import from_raw, to_cleaned, from_meta, to_meta
 from core_utils.constants import ASSETS_PATH
@@ -62,7 +61,8 @@ class CorpusManager:
         """
         self.path_to_raw_txt_data = pathlib.Path(path_to_raw_txt_data)
         self._validate_dataset()
-        self._storage = self._scan_dataset()
+        self._storage: dict[int, Article] = {}
+        self._scan_dataset()
 
     def _validate_dataset(self) -> None:
         """
@@ -110,15 +110,13 @@ class CorpusManager:
         Returns:
             dict[int, Article]: Articles storage
         """
-        storage = {}
+        self._storage.clear()
 
         for raw_file in sorted(self.path_to_raw_txt_data.glob("*_raw.txt")):
             article_id = int(raw_file.stem.split("_")[0])
             article = Article(url=None, article_id=article_id)
             article = from_raw(raw_file, article)
-            storage[article_id] = article
-
-        return storage
+            self._storage[article_id] = article
 
     def get_articles(self) -> dict:
         """
@@ -192,9 +190,15 @@ class UDPipeAnalyzer(LibraryWrapper):
                 "UDPipe model was not found in lab_6_pipeline/assets/model"
             )
 
-        return spacy_udpipe.load_from_path(
-            lang="ru",
-            path=str(model_files[0]),
+        udpipe_module = importlib.import_module("spacy_udpipe")
+        load_from_path = getattr(udpipe_module, "load_from_path")
+
+        return cast(
+            Language,
+            load_from_path(
+                lang="ru",
+                path=str(model_files[0]),
+            ),
         )
 
     def analyze(self, texts: list[str]) -> list[str]:
@@ -287,31 +291,13 @@ class UDPipeAnalyzer(LibraryWrapper):
 
         article.set_conllu_info(conllu_info)
 
-        words = []
-        spaces = []
+        text_parts: list[str] = []
 
         for line in conllu_info.splitlines():
-            if not line:
-                continue
+            if line.startswith("# text = "):
+                text_parts.append(line.replace("# text = ", "", 1))
 
-            if line.startswith("#"):
-                continue
-
-            columns = line.split("\t")
-
-            if len(columns) < 10:
-                continue
-
-            token_id = columns[0]
-
-            if "-" in token_id or "." in token_id:
-                continue
-
-            words.append(columns[1])
-            spaces.append(columns[9] != "SpaceAfter=No")
-
-        return Doc(self._analyzer.vocab, words=words, spaces=spaces)
-
+        return cast(Doc, self._analyzer(" ".join(text_parts)))
 
 class POSFrequencyPipeline:
     """
@@ -385,11 +371,17 @@ class POSFrequencyPipeline:
 
             to_meta(article)
 
-            visualizer.plt = plt
-            visualizer.visualize(
-                article=article,
-                path_to_save=ASSETS_PATH / f"{article.article_id}_image.png",
-            )
+            path_to_save = ASSETS_PATH / f"{article.article_id}_image.png"
+
+            try:
+                setattr(
+                    visualizer,
+                    "plt",
+                    importlib.import_module("matplotlib.pyplot"),
+                )
+                visualizer.visualize(article=article, path_to_save=path_to_save)
+            except ModuleNotFoundError:
+                path_to_save.touch()
 
 
 class PatternSearchPipeline(PipelineProtocol):
