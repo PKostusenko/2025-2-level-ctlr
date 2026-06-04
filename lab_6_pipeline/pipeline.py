@@ -40,6 +40,12 @@ class InconsistentDatasetError(Exception):
     """
 
 
+class EmptyFileError(Exception):
+    """
+    Raised when file is empty.
+    """
+
+
 class CorpusManager:
     """
     Work with articles and store them.
@@ -95,7 +101,7 @@ class CorpusManager:
             if raw_file.stat().st_size == 0:
                 raise InconsistentDatasetError(f"File {raw_file.name} is empty.")
 
-    def _scan_dataset(self) -> dict[int, Article]:
+    def _scan_dataset(self) -> None:
         """
         Register each dataset entry.
 
@@ -106,11 +112,13 @@ class CorpusManager:
 
         for raw_file in sorted(self.path_to_raw_txt_data.glob("*_raw.txt")):
             article_id = int(raw_file.stem.split("_")[0])
-            storage[article_id] = Article(url=None, article_id=article_id)
+            article = Article(url=None, article_id=article_id)
+            article = from_raw(raw_file, article)
+            storage[article_id] = article
 
         return storage
 
-    def get_articles(self) -> dict[int, Article]:
+    def get_articles(self) -> dict:
         """
         Get storage params.
 
@@ -144,11 +152,13 @@ class TextProcessingPipeline(PipelineProtocol):
         """
         articles = self._corpus.get_articles()
 
-        for article_id, article in articles.items():
-            raw_path = ASSETS_PATH / f"{article_id}_raw.txt"
-            article = from_raw(raw_path, article)
+        for article in articles.values():
             to_cleaned(article)
 
+            if isinstance(self._analyzer, UDPipeAnalyzer):
+                conllu_text = self._analyzer.analyze([article.get_raw_text()])[0]
+                article.set_conllu_info(conllu_text)
+                self._analyzer.to_conllu(article)
 
 class UDPipeAnalyzer(LibraryWrapper):
     """
@@ -162,6 +172,7 @@ class UDPipeAnalyzer(LibraryWrapper):
         """
         Initialize an instance of the UDPipeAnalyzer class.
         """
+        self._analyzer = self._bootstrap()
 
     def _bootstrap(self) -> Language:
         """
@@ -170,6 +181,18 @@ class UDPipeAnalyzer(LibraryWrapper):
         Returns:
             Language: Analyzer instance
         """
+        model_dir = pathlib.Path(__file__).parent / "assets" / "model"
+        model_files = list(model_dir.glob("*.udpipe"))
+
+        if not model_files:
+            raise FileNotFoundError(
+                "UDPipe model was not found in lab_6_pipeline/assets/model"
+            )
+
+        return spacy_udpipe.load_from_path(
+            lang="ru",
+            path=str(model_files[0]),
+        )
 
     def analyze(self, texts: list[str]) -> list[str]:
         """
@@ -181,6 +204,52 @@ class UDPipeAnalyzer(LibraryWrapper):
         Returns:
             list[str]: List of documents
         """
+        analyzed_texts = []
+
+        for text in texts:
+            doc = self._analyzer(text)
+            conllu_lines = []
+            sentence_id = 1
+
+            for sentence in doc.sents:
+                conllu_lines.append(f"# sent_id = {sentence_id}")
+                conllu_lines.append(f"# text = {sentence.text}")
+
+                for token_number, token in enumerate(sentence, start=1):
+                    head_number = 0
+
+                    if token.head != token:
+                        head_number = token.head.i - sentence.start + 1
+
+                    morph = str(token.morph) if str(token.morph) else "_"
+                    misc = "_"
+
+                    if not token.whitespace_:
+                        misc = "SpaceAfter=No"
+
+                    conllu_lines.append(
+                        "\t".join(
+                            [
+                                str(token_number),
+                                token.text,
+                                token.lemma_,
+                                token.pos_,
+                                token.tag_ or "_",
+                                morph,
+                                str(head_number),
+                                token.dep_,
+                                "_",
+                                misc,
+                            ]
+                        )
+                    )
+
+                conllu_lines.append("")
+                sentence_id += 1
+
+            analyzed_texts.append("\n".join(conllu_lines))
+
+        return analyzed_texts
 
     def to_conllu(self, article: Article) -> None:
         """
@@ -189,6 +258,11 @@ class UDPipeAnalyzer(LibraryWrapper):
         Args:
             article (Article): Article containing information to save
         """
+        path_to_save = article.get_file_path(ArtifactType.UDPIPE_CONLLU)
+        conllu_info = article.get_conllu_info().rstrip("\n") + "\n\n"
+
+        with open(path_to_save, "w", encoding="utf-8") as file:
+            file.write(conllu_info)
 
     def from_conllu(self, article: Article) -> Doc:
         """
@@ -200,6 +274,7 @@ class UDPipeAnalyzer(LibraryWrapper):
         Returns:
             Doc: Document ready for parsing
         """
+        raise NotImplementedError("This method is required for marks 8 and 10.")
 
 
 class POSFrequencyPipeline:
@@ -296,7 +371,8 @@ def main() -> None:
     Entrypoint for pipeline module.
     """
     corpus_manager = CorpusManager(path_to_raw_txt_data=ASSETS_PATH)
-    pipeline = TextProcessingPipeline(corpus_manager=corpus_manager)
+    analyzer = UDPipeAnalyzer()
+    pipeline = TextProcessingPipeline(corpus_manager, analyzer)
     pipeline.run()
 
 
