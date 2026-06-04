@@ -8,7 +8,7 @@ import pathlib
 import spacy_udpipe
 
 from core_utils.article.article import Article, ArtifactType
-from core_utils.article.io import from_raw, to_cleaned
+from core_utils.article.io import from_raw, to_cleaned, from_meta, to_meta
 from core_utils.constants import ASSETS_PATH
 from core_utils.pipeline import LibraryWrapper, PipelineProtocol, TreeNode
 
@@ -274,7 +274,40 @@ class UDPipeAnalyzer(LibraryWrapper):
         Returns:
             Doc: Document ready for parsing
         """
-        raise NotImplementedError("This method is required for marks 8 and 10.")
+        path_to_read = article.get_file_path(ArtifactType.UDPIPE_CONLLU)
+
+        with open(path_to_read, "r", encoding="utf-8") as file:
+            conllu_info = file.read()
+
+        if not conllu_info.strip():
+            raise EmptyFileError("ConLLU file is empty.")
+
+        article.set_conllu_info(conllu_info)
+
+        words = []
+        spaces = []
+
+        for line in conllu_info.splitlines():
+            if not line:
+                continue
+
+            if line.startswith("#"):
+                continue
+
+            columns = line.split("\t")
+
+            if len(columns) < 10:
+                continue
+
+            token_id = columns[0]
+
+            if "-" in token_id or "." in token_id:
+                continue
+
+            words.append(columns[1])
+            spaces.append(columns[9] != "SpaceAfter=No")
+
+        return Doc(self._analyzer.vocab, words=words, spaces=spaces)
 
 
 class POSFrequencyPipeline:
@@ -290,6 +323,8 @@ class POSFrequencyPipeline:
             corpus_manager (CorpusManager): CorpusManager instance
             analyzer (LibraryWrapper): Analyzer instance
         """
+        self._corpus = corpus_manager
+        self._analyzer = analyzer
 
     def _count_frequencies(self, article: Article) -> dict[str, int]:
         """
@@ -301,11 +336,60 @@ class POSFrequencyPipeline:
         Returns:
             dict[str, int]: POS frequencies
         """
+        conllu_info = article.get_conllu_info()
+
+        if not conllu_info.strip():
+            raise EmptyFileError("ConLLU file is empty.")
+
+        frequencies = {}
+
+        for line in conllu_info.splitlines():
+            if not line:
+                continue
+
+            if line.startswith("#"):
+                continue
+
+            columns = line.split("\t")
+
+            if len(columns) < 4:
+                continue
+
+            token_id = columns[0]
+
+            if "-" in token_id or "." in token_id:
+                continue
+
+            pos = columns[3]
+            frequencies[pos] = frequencies.get(pos, 0) + 1
+
+        return frequencies
 
     def run(self) -> None:
         """
         Visualize the frequencies of each part of speech.
         """
+        articles = self._corpus.get_articles()
+
+        for article in articles.values():
+            self._analyzer.from_conllu(article)
+
+            meta_path = article.get_meta_file_path()
+            article = from_meta(meta_path, article)
+
+            frequencies = self._count_frequencies(article)
+            article.set_pos_info(frequencies)
+
+            to_meta(article)
+
+            import matplotlib.pyplot as plt
+            import core_utils.visualizer as visualizer
+
+            visualizer.plt = plt
+            visualizer.visualize(
+                article=article,
+                path_to_save=ASSETS_PATH / f"{article.article_id}_image.png",
+            )
 
 
 class PatternSearchPipeline(PipelineProtocol):
