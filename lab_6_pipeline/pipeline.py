@@ -5,8 +5,10 @@ Pipeline for CONLL-U formatting.
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks, duplicate-code
 import pathlib
 
+import matplotlib.pyplot as plt
 import spacy_udpipe
 
+import core_utils.visualizer as visualizer
 from core_utils.article.article import Article, ArtifactType
 from core_utils.article.io import from_raw, to_cleaned, from_meta, to_meta
 from core_utils.constants import ASSETS_PATH
@@ -159,6 +161,7 @@ class TextProcessingPipeline(PipelineProtocol):
                 conllu_text = self._analyzer.analyze([article.get_raw_text()])[0]
                 article.set_conllu_info(conllu_text)
                 self._analyzer.to_conllu(article)
+
 
 class UDPipeAnalyzer(LibraryWrapper):
     """
@@ -381,9 +384,6 @@ class POSFrequencyPipeline:
             article.set_pos_info(frequencies)
 
             to_meta(article)
-
-            import matplotlib.pyplot as plt
-            import core_utils.visualizer as visualizer
 
             visualizer.plt = plt
             visualizer.visualize(
