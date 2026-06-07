@@ -527,13 +527,20 @@ def main() -> None:
     Entrypoint for pipeline module.
     """
     corpus_manager = CorpusManager(path_to_raw_txt_data=ASSETS_PATH)
-    try:
-        analyzer = UDPipeAnalyzer()
-        pipeline = TextProcessingPipeline(corpus_manager, analyzer)
-    except ImportError:
-        pipeline = TextProcessingPipeline(corpus_manager)
+    analyzer = UDPipeAnalyzer()
 
-    pipeline.run()
+    text_pipeline = TextProcessingPipeline(corpus_manager, analyzer)
+    text_pipeline.run()
+
+    pos_pipeline = POSFrequencyPipeline(corpus_manager, analyzer)
+    pos_pipeline.run()
+
+    pattern_pipeline = PatternSearchPipeline(
+        corpus_manager,
+        analyzer,
+        ("VERB", "NOUN", "ADP"),
+    )
+    pattern_pipeline.run()
 
 
 if __name__ == "__main__":
