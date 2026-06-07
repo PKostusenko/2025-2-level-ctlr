@@ -3,9 +3,14 @@ Pipeline for CONLL-U formatting.
 """
 
 # pylint: disable=too-few-public-methods, unused-import, undefined-variable, too-many-nested-blocks, duplicate-code
-import importlib
 import pathlib
-from typing import cast
+from collections import Counter
+
+import matplotlib.pyplot as plt
+import spacy_conll
+import spacy_udpipe
+from spacy.training.converters import conllu_to_docs
+from spacy_conll.parser import ConllParser
 
 from core_utils import visualizer
 from core_utils.article.article import Article, ArtifactType
@@ -190,16 +195,17 @@ class UDPipeAnalyzer(LibraryWrapper):
                 "UDPipe model was not found in lab_6_pipeline/assets/model"
             )
 
-        udpipe_module = importlib.import_module("spacy_udpipe")
-        load_from_path = getattr(udpipe_module, "load_from_path")
-
-        return cast(
-            Language,
-            load_from_path(
-                lang="ru",
-                path=str(model_files[0]),
-            ),
+        analyzer = spacy_udpipe.load_from_path(
+            lang="ru",
+            path=str(model_files[0]),
         )
+        analyzer.add_pipe(
+            "conll_formatter",
+            config={"include_headers": True},
+            last=True,
+        )
+
+        return analyzer
 
     def analyze(self, texts: list[str]) -> list[str]:
         """
@@ -213,48 +219,8 @@ class UDPipeAnalyzer(LibraryWrapper):
         """
         analyzed_texts = []
 
-        for text in texts:
-            doc = self._analyzer(text)
-            conllu_lines = []
-            sentence_id = 1
-
-            for sentence in doc.sents:
-                conllu_lines.append(f"# sent_id = {sentence_id}")
-                conllu_lines.append(f"# text = {sentence.text}")
-
-                for token_number, token in enumerate(sentence, start=1):
-                    head_number = 0
-
-                    if token.head != token:
-                        head_number = token.head.i - sentence.start + 1
-
-                    morph = str(token.morph) if str(token.morph) else "_"
-                    misc = "_"
-
-                    if not token.whitespace_:
-                        misc = "SpaceAfter=No"
-
-                    conllu_lines.append(
-                        "\t".join(
-                            [
-                                str(token_number),
-                                token.text,
-                                token.lemma_,
-                                token.pos_,
-                                token.tag_ or "_",
-                                morph,
-                                str(head_number),
-                                token.dep_,
-                                "_",
-                                misc,
-                            ]
-                        )
-                    )
-
-                conllu_lines.append("")
-                sentence_id += 1
-
-            analyzed_texts.append("\n".join(conllu_lines))
+        for doc in self._analyzer.pipe(texts):
+            analyzed_texts.append(doc._.conll_str)
 
         return analyzed_texts
 
@@ -291,56 +257,22 @@ class UDPipeAnalyzer(LibraryWrapper):
 
         article.set_conllu_info(conllu_info)
 
-        sentences = []
-        current_sentence = []
-        text_parts = []
+        parser = ConllParser(self._analyzer)
 
-        for line in conllu_info.splitlines():
-            line = line.strip()
-
-            if not line:
-                if current_sentence:
-                    sentences.append(current_sentence)
-                    current_sentence = []
-                continue
-
-            if line.startswith("# text = "):
-                text_parts.append(line.replace("# text = ", "", 1))
-                continue
-
-            if line.startswith("#"):
-                continue
-
-            columns = line.split("\t")
-
-            if len(columns) < 8:
-                columns = line.split()
-
-            if len(columns) < 8:
-                continue
-
-            token_id = columns[0]
-
-            if "-" in token_id or "." in token_id:
-                continue
-
-            current_sentence.append(
-                {
-                    "id": int(token_id),
-                    "text": columns[1],
-                    "upos": columns[3],
-                    "head": int(columns[6]),
-                    "deprel": columns[7],
-                }
+        try:
+            parsed_doc: Doc = parser.parse_conll_text_as_spacy(conllu_info)
+            return parsed_doc
+        except ValueError:
+            docs = list(
+                conllu_to_docs(
+                    conllu_info,
+                    n_sents=1000,
+                    no_print=True,
+                )
             )
 
-        if current_sentence:
-            sentences.append(current_sentence)
+        return Doc.from_docs(docs)
 
-        doc = self._analyzer(" ".join(text_parts))
-        doc.user_data["conllu_sentences"] = sentences
-
-        return cast(Doc, doc)
 
 class POSFrequencyPipeline:
     """
@@ -368,34 +300,9 @@ class POSFrequencyPipeline:
         Returns:
             dict[str, int]: POS frequencies
         """
-        conllu_info = article.get_conllu_info()
-
-        if not conllu_info.strip():
-            raise EmptyFileError("ConLLU file is empty.")
-
-        frequencies = {}
-
-        for line in conllu_info.splitlines():
-            if not line:
-                continue
-
-            if line.startswith("#"):
-                continue
-
-            columns = line.split("\t")
-
-            if len(columns) < 4:
-                continue
-
-            token_id = columns[0]
-
-            if "-" in token_id or "." in token_id:
-                continue
-
-            pos = columns[3]
-            frequencies[pos] = frequencies.get(pos, 0) + 1
-
-        return frequencies
+        doc = self._analyzer.from_conllu(article)
+        frequencies = Counter(token.pos_ for token in doc if token.pos_)
+        return dict(frequencies)
 
     def run(self) -> None:
         """
@@ -404,7 +311,6 @@ class POSFrequencyPipeline:
         articles = self._corpus.get_articles()
 
         for article in articles.values():
-            self._analyzer.from_conllu(article)
 
             meta_path = article.get_meta_file_path()
             article = from_meta(meta_path, article)
@@ -415,16 +321,8 @@ class POSFrequencyPipeline:
             to_meta(article)
 
             path_to_save = ASSETS_PATH / f"{article.article_id}_image.png"
-
-            try:
-                setattr(
-                    visualizer,
-                    "plt",
-                    importlib.import_module("matplotlib.pyplot"),
-                )
-                visualizer.visualize(article=article, path_to_save=path_to_save)
-            except ModuleNotFoundError:
-                path_to_save.touch()
+            visualizer.plt = plt
+            visualizer.visualize(article=article, path_to_save=path_to_save)
 
 
 class PatternSearchPipeline(PipelineProtocol):
@@ -461,24 +359,21 @@ class PatternSearchPipeline(PipelineProtocol):
             raise ImportError("networkx is not installed.")
 
         graphs = []
-        sentences = doc.user_data.get("conllu_sentences", [])
 
-        for sentence in sentences:
+        for sentence in doc.sents:
             graph = DiGraph()
 
             for token in sentence:
                 graph.add_node(
-                    token["id"],
-                    label=token["upos"],
-                    upos=token["upos"],
-                    text=token["text"],
+                    token.i,
+                    label=token.pos_,
+                    upos=token.pos_,
+                    text=token.text,
                 )
 
             for token in sentence:
-                head = token["head"]
-
-                if head != 0 and graph.has_node(head):
-                    graph.add_edge(head, token["id"], label=token["deprel"])
+                if token.head.i != token.i and token.head.i in graph.nodes:
+                    graph.add_edge(token.head.i, token.i, label=token.dep_)
 
             graphs.append(graph)
 
@@ -545,46 +440,42 @@ class PatternSearchPipeline(PipelineProtocol):
                 pattern_graph,
                 node_match=lambda first, second: first["label"] == second["label"],
             )
-
-            sentence_matches = []
-            used_signatures = set()
+            matches = []
+            used = set()
 
             for match in matcher.subgraph_isomorphisms_iter():
-                root_ids = [
-                    node_id
-                    for node_id, pattern_id in match.items()
-                    if pattern_id == 0
-                ]
+                root_id = next(
+                    (
+                        node_id
+                        for node_id, pattern_id in match.items()
+                        if pattern_id == 0
+                    ),
+                    None,
+                )
 
-                if not root_ids:
+                if root_id is None:
                     continue
 
-                root_id = root_ids[0]
                 signature = tuple(
                     node_id
-                    for node_id, _ in sorted(
-                        match.items(),
-                        key=lambda item: item[1],
-                    )
+                    for node_id, _ in sorted(match.items(), key=lambda item: item[1])
                 )
 
-                if signature in used_signatures:
+                if signature in used:
                     continue
 
-                used_signatures.add(signature)
-
-                root_data = graph.nodes[root_id]
-                root_node = TreeNode(
-                    upos=root_data["upos"],
-                    text=root_data["text"],
+                used.add(signature)
+                root = TreeNode(
+                    upos=graph.nodes[root_id]["upos"],
+                    text=graph.nodes[root_id]["text"],
                     children=[],
                 )
-                self._add_children(graph, match, root_id, root_node)
-                sentence_matches.append((signature, root_node))
+                self._add_children(graph, match, root_id, root)
+                matches.append((signature, root))
 
-            if sentence_matches:
+            if matches:
                 result[sentence_id] = [
-                    node for _, node in sorted(sentence_matches, key=lambda item: item[0])
+                    node for _, node in sorted(matches, key=lambda item: item[0])
                 ]
 
         return result
