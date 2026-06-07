@@ -291,13 +291,56 @@ class UDPipeAnalyzer(LibraryWrapper):
 
         article.set_conllu_info(conllu_info)
 
-        text_parts: list[str] = []
+        sentences = []
+        current_sentence = []
+        text_parts = []
 
         for line in conllu_info.splitlines():
+            line = line.strip()
+
+            if not line:
+                if current_sentence:
+                    sentences.append(current_sentence)
+                    current_sentence = []
+                continue
+
             if line.startswith("# text = "):
                 text_parts.append(line.replace("# text = ", "", 1))
+                continue
 
-        return cast(Doc, self._analyzer(" ".join(text_parts)))
+            if line.startswith("#"):
+                continue
+
+            columns = line.split("\t")
+
+            if len(columns) < 8:
+                columns = line.split()
+
+            if len(columns) < 8:
+                continue
+
+            token_id = columns[0]
+
+            if "-" in token_id or "." in token_id:
+                continue
+
+            current_sentence.append(
+                {
+                    "id": int(token_id),
+                    "text": columns[1],
+                    "upos": columns[3],
+                    "head": int(columns[6]),
+                    "deprel": columns[7],
+                }
+            )
+
+        if current_sentence:
+            sentences.append(current_sentence)
+
+        doc = self._analyzer(" ".join(text_parts))
+        doc.user_data["conllu_sentences"] = sentences
+
+        return cast(Doc, doc)
 
 class POSFrequencyPipeline:
     """
@@ -400,6 +443,9 @@ class PatternSearchPipeline(PipelineProtocol):
             analyzer (LibraryWrapper): Analyzer instance
             pos (tuple[str, ...]): Root, Dependency, Child part of speech
         """
+        self._corpus = corpus_manager
+        self._analyzer = analyzer
+        self._pos = pos
 
     def _make_graphs(self, doc: Doc) -> list[DiGraph]:
         """
@@ -411,6 +457,32 @@ class PatternSearchPipeline(PipelineProtocol):
         Returns:
             list[DiGraph]: Graphs for the sentences in the document
         """
+        if DiGraph is None:
+            raise ImportError("networkx is not installed.")
+
+        graphs = []
+        sentences = doc.user_data.get("conllu_sentences", [])
+
+        for sentence in sentences:
+            graph = DiGraph()
+
+            for token in sentence:
+                graph.add_node(
+                    token["id"],
+                    label=token["upos"],
+                    upos=token["upos"],
+                    text=token["text"],
+                )
+
+            for token in sentence:
+                head = token["head"]
+
+                if head != 0 and graph.has_node(head):
+                    graph.add_edge(head, token["id"], label=token["deprel"])
+
+            graphs.append(graph)
+
+        return graphs
 
     def _add_children(
         self, graph: DiGraph, subgraph_to_graph: dict, node_id: int, tree_node: TreeNode
@@ -424,6 +496,25 @@ class PatternSearchPipeline(PipelineProtocol):
             node_id (int): ID of root node of the match
             tree_node (TreeNode): Root node of the match
         """
+        current_pattern_id = subgraph_to_graph[node_id]
+
+        for child_id in graph.successors(node_id):
+            if child_id not in subgraph_to_graph:
+                continue
+
+            child_pattern_id = subgraph_to_graph[child_id]
+
+            if child_pattern_id != current_pattern_id + 1:
+                continue
+
+            child_data = graph.nodes[child_id]
+            child_node = TreeNode(
+                upos=child_data["upos"],
+                text=child_data["text"],
+                children=[],
+            )
+            tree_node.children.append(child_node)
+            self._add_children(graph, subgraph_to_graph, child_id, child_node)
 
     def _find_pattern(self, doc_graphs: list) -> dict[int, list[TreeNode]]:
         """
@@ -435,11 +526,102 @@ class PatternSearchPipeline(PipelineProtocol):
         Returns:
             dict[int, list[TreeNode]]: A dictionary with pattern matches
         """
+        if DiGraph is None or DiGraphMatcher is None:
+            raise ImportError("networkx is not installed.")
+
+        pattern_graph = DiGraph()
+
+        for index, pos_tag in enumerate(self._pos):
+            pattern_graph.add_node(index, label=pos_tag)
+
+            if index > 0:
+                pattern_graph.add_edge(index - 1, index)
+
+        result = {}
+
+        for sentence_id, graph in enumerate(doc_graphs):
+            matcher = DiGraphMatcher(
+                graph,
+                pattern_graph,
+                node_match=lambda first, second: first["label"] == second["label"],
+            )
+
+            sentence_matches = []
+            used_signatures = set()
+
+            for match in matcher.subgraph_isomorphisms_iter():
+                root_ids = [
+                    node_id
+                    for node_id, pattern_id in match.items()
+                    if pattern_id == 0
+                ]
+
+                if not root_ids:
+                    continue
+
+                root_id = root_ids[0]
+                signature = tuple(
+                    node_id
+                    for node_id, _ in sorted(
+                        match.items(),
+                        key=lambda item: item[1],
+                    )
+                )
+
+                if signature in used_signatures:
+                    continue
+
+                used_signatures.add(signature)
+
+                root_data = graph.nodes[root_id]
+                root_node = TreeNode(
+                    upos=root_data["upos"],
+                    text=root_data["text"],
+                    children=[],
+                )
+                self._add_children(graph, match, root_id, root_node)
+                sentence_matches.append((signature, root_node))
+
+            if sentence_matches:
+                result[sentence_id] = [
+                    node for _, node in sorted(sentence_matches, key=lambda item: item[0])
+                ]
+
+        return result
 
     def run(self) -> None:
         """
         Search for a pattern in documents and writes found information to JSON file.
         """
+        def tree_to_dict(tree_node: TreeNode) -> dict:
+            node_info = vars(tree_node).copy()
+            node_info["children"] = [
+                tree_to_dict(child)
+                for child in node_info.get("children", [])
+            ]
+            return node_info
+
+        articles = self._corpus.get_articles()
+
+        for article in articles.values():
+            doc = self._analyzer.from_conllu(article)
+            graphs = self._make_graphs(doc)
+            patterns = self._find_pattern(graphs)
+
+            meta_path = article.get_meta_file_path()
+            article = from_meta(meta_path, article)
+
+            article.set_patterns_info(
+                {
+                    sentence_id: [
+                        tree_to_dict(pattern)
+                        for pattern in sentence_patterns
+                    ]
+                    for sentence_id, sentence_patterns in patterns.items()
+                }
+            )
+
+            to_meta(article)
 
 
 def main() -> None:
